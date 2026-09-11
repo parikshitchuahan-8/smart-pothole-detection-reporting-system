@@ -1,0 +1,1 @@
+package com.roadwatch.report; import org.springframework.stereotype.Service; @Service class AuthorityRouter { String forLocation(double latitude,double longitude){ if(latitude>=28.4&&latitude<=28.9&&longitude>=76.8&&longitude<=77.5)return "Municipal Corporation of Delhi (MCD)"; return "Relevant Municipal Public Works Department"; } }

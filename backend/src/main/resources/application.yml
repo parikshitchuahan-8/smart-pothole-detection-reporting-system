@@ -1,0 +1,22 @@
+spring:
+  config:
+    import: optional:file:.env[.properties]
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/pothole_reporting}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+  jpa:
+    hibernate.ddl-auto: update
+    open-in-view: false
+  servlet.multipart:
+    max-file-size: 100MB
+    max-request-size: 100MB
+aws:
+  region: ${AWS_REGION:ap-south-1}
+  bucket: ${AWS_S3_BUCKET:}
+  public-base-url: ${AWS_S3_PUBLIC_BASE_URL:}
+detection:
+  model-url: ${POTHOLE_MODEL_URL:}
+  token: ${POTHOLE_MODEL_TOKEN:}
+civic:
+  webhook: ${CIVIC_REPORTING_WEBHOOK:}

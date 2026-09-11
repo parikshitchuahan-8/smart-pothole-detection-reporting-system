@@ -1,0 +1,1 @@
+package com.roadwatch.report; import java.util.List; import org.springframework.data.jpa.repository.JpaRepository; interface ReportRepository extends JpaRepository<PotholeReport,String> { List<PotholeReport> findByStatusOrderByCreatedAtDesc(ReportStatus status); List<PotholeReport> findAllByOrderByCreatedAtDesc(); }
