@@ -12,11 +12,12 @@ spring:
     max-file-size: 100MB
     max-request-size: 100MB
 aws:
-  region: ${AWS_REGION:ap-south-1}
+  region: ${AWS_REGION:ap-southeast-1}
   bucket: ${AWS_S3_BUCKET:}
   public-base-url: ${AWS_S3_PUBLIC_BASE_URL:}
 detection:
   model-url: ${POTHOLE_MODEL_URL:}
   token: ${POTHOLE_MODEL_TOKEN:}
+  minimum-confidence: ${POTHOLE_MINIMUM_CONFIDENCE:0.40}
 civic:
   webhook: ${CIVIC_REPORTING_WEBHOOK:}

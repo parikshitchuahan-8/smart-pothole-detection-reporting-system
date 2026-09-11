@@ -1,3 +1,108 @@
 package com.roadwatch.report;
-import java.time.*; import java.util.*; import org.springframework.http.*; import org.springframework.web.bind.annotation.*; import org.springframework.web.multipart.MultipartFile;
-@RestController @RequestMapping("/api/reports") @CrossOrigin(origins="http://localhost:5173") public class ReportController { private final ReportRepository repo; private final S3EvidenceStorage storage; private final PotholeDetector detector; private final AuthorityRouter router; private final CivicNotifier notifier; ReportController(ReportRepository repo,S3EvidenceStorage storage,PotholeDetector detector,AuthorityRouter router,CivicNotifier notifier){this.repo=repo;this.storage=storage;this.detector=detector;this.router=router;this.notifier=notifier;} @GetMapping public List<PotholeReport> list(@RequestParam(required=false)ReportStatus status){return status==null?repo.findAllByOrderByCreatedAtDesc():repo.findByStatusOrderByCreatedAtDesc(status);} @PostMapping(value="/detect",consumes=MediaType.MULTIPART_FORM_DATA_VALUE) public ResponseEntity<?> detect(@RequestParam MultipartFile file,@RequestParam double latitude,@RequestParam double longitude,@RequestParam String capturedAt){try{if(file.isEmpty())return ResponseEntity.badRequest().body(Map.of("message","Evidence file is required."));PotholeDetector.Detection detection=detector.detect(file);S3EvidenceStorage.Stored stored=storage.upload(file);PotholeReport report=new PotholeReport();report.setLatitude(latitude);report.setLongitude(longitude);report.setCapturedAt(LocalDateTime.parse(capturedAt).atZone(ZoneId.systemDefault()).toInstant());report.setConfidence(detection.confidence());report.setSeverity(detection.severity());report.setAuthority(router.forLocation(latitude,longitude));report.setEvidenceUrl(stored.url());report.setStorageKey(stored.key());report=repo.save(report);notifier.notify(report);return ResponseEntity.status(HttpStatus.CREATED).body(report);}catch(Exception e){return ResponseEntity.status(502).body(Map.of("message","Could not create report. Check S3 and detector configuration."));}} @PatchMapping("/{id}/status") public PotholeReport status(@PathVariable String id,@RequestBody Map<String,String> body){PotholeReport report=repo.findById(id).orElseThrow();report.setStatus(ReportStatus.valueOf(body.get("status")));return repo.save(report);} }
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.Map;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+@RestController
+@RequestMapping("/api/reports")
+@CrossOrigin(origins = "${app.cors-origin:http://localhost:5173}")
+public class ReportController {
+  private final ReportRepository repository;
+  private final S3EvidenceStorage storage;
+  private final PotholeDetector detector;
+  private final AuthorityRouter authorityRouter;
+  private final CivicNotifier notifier;
+
+  ReportController(ReportRepository repository, S3EvidenceStorage storage, PotholeDetector detector,
+                   AuthorityRouter authorityRouter, CivicNotifier notifier) {
+    this.repository = repository;
+    this.storage = storage;
+    this.detector = detector;
+    this.authorityRouter = authorityRouter;
+    this.notifier = notifier;
+  }
+
+  @GetMapping
+  public List<PotholeReport> list(@RequestParam(required = false) ReportStatus status) {
+    return status == null ? repository.findAllByOrderByCreatedAtDesc()
+        : repository.findByStatusOrderByCreatedAtDesc(status);
+  }
+
+  @PostMapping(value = "/detect", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ResponseEntity<?> detect(
+      @RequestParam MultipartFile file,
+      @RequestParam double latitude,
+      @RequestParam double longitude,
+      @RequestParam LocalDateTime capturedAt) throws IOException {
+    if (file.isEmpty()) return badRequest("Road evidence is required.");
+    if (!isCoordinateValid(latitude, longitude)) return badRequest("Latitude or longitude is out of range.");
+    if (file.getContentType() == null || !file.getContentType().startsWith("image/")) {
+      return badRequest("Submit a road image. Video frame extraction is handled by the mobile/dashcam client.");
+    }
+
+    PotholeDetector.Detection detection;
+    try {
+      detection = detector.detect(file);
+    } catch (PotholeDetector.DetectionUnavailableException exception) {
+      return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+          .body(Map.of("message", exception.getMessage()));
+    }
+
+    if (!detection.isPothole()) {
+      return ResponseEntity.unprocessableEntity().body(Map.of(
+          "message", "No pothole met the configured detection-confidence threshold.",
+          "minimumConfidence", 0.40));
+    }
+
+    S3EvidenceStorage.Stored stored = storage.upload(file);
+    PotholeReport report = new PotholeReport();
+    report.setLatitude(latitude);
+    report.setLongitude(longitude);
+    report.setCapturedAt(capturedAt.atZone(ZoneId.systemDefault()).toInstant());
+    report.setConfidence(detection.confidence());
+    report.setSeverity(detection.severity());
+    report.setAuthority(authorityRouter.forLocation(latitude, longitude));
+    report.setEvidenceUrl(stored.url());
+    report.setStorageKey(stored.key());
+    report.transitionTo(ReportStatus.REPORTED);
+    report = repository.save(report);
+
+    notifier.notify(report);
+    return ResponseEntity.status(HttpStatus.CREATED).body(report);
+  }
+
+  @PatchMapping("/{id}/status")
+  public PotholeReport updateStatus(@PathVariable String id, @Valid @RequestBody StatusUpdate request) {
+    PotholeReport report = repository.findById(id).orElseThrow();
+    report.transitionTo(request.status());
+    return repository.save(report);
+  }
+
+  private boolean isCoordinateValid(double latitude, double longitude) {
+    return latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+  }
+
+  private ResponseEntity<Map<String, String>> badRequest(String message) {
+    return ResponseEntity.badRequest().body(Map.of("message", message));
+  }
+
+  record StatusUpdate(@NotNull ReportStatus status) {}
+}
