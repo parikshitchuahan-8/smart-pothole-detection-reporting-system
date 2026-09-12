@@ -7,8 +7,9 @@ import {
   Send,
   CheckCircle2,
   LocateFixed,
+  Download,
 } from "lucide-react";
-import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, Popup, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import "./styles.css";
 
@@ -22,6 +23,15 @@ const color = {
   IN_PROGRESS: "#397bbb",
   RESOLVED: "#2e9168",
 };
+
+function LocationPicker({ onLocationSelect }) {
+  useMapEvents({
+    click(e) {
+      onLocationSelect(e.latlng.lat.toFixed(6), e.latlng.lng.toFixed(6));
+    },
+  });
+  return null;
+}
 
 function App() {
   const [reports, setReports] = useState([]);
@@ -134,14 +144,46 @@ function App() {
     );
   };
 
+  const exportToCsv = () => {
+    if (filteredReports.length === 0) return setNotice("No reports available to export.");
+    const headers = ["ID", "Authority", "Severity", "Confidence", "Status", "Latitude", "Longitude", "CapturedAt", "EvidenceUrl"];
+    const rows = filteredReports.map((r) => [
+      r.id,
+      `"${r.authority}"`,
+      r.severity,
+      Math.round(r.confidence * 100) + "%",
+      r.status,
+      r.latitude,
+      r.longitude,
+      r.capturedAt,
+      r.evidenceUrl,
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `roadwatch_reports_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setNotice(`Exported ${filteredReports.length} records to CSV.`);
+  };
+
   return (
     <main>
       <header>
         <div className="logo">
           <CircleAlert /> RoadWatch <span>SMART CIVIC REPORTING</span>
         </div>
-        <div className="live">
-          <span /> Live incident monitor
+        <div className="live" style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+          <span></span> Live incident monitor
+          <button 
+            type="button" 
+            onClick={exportToCsv}
+            style={{ display: "flex", alignItems: "center", gap: "6px", background: "#245d4e", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}
+          >
+            <Download size={14} /> Export CSV
+          </button>
         </div>
       </header>
       <section className="hero">
@@ -244,6 +286,12 @@ function App() {
               <TileLayer
                 attribution="&copy; OpenStreetMap contributors"
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <LocationPicker
+                onLocationSelect={(lat, lng) => {
+                  setForm((f) => ({ ...f, latitude: lat, longitude: lng }));
+                  setNotice(`Coordinates set to ${lat}, ${lng} from map click.`);
+                }}
               />
               {filteredReports.map((report) => (
                 <CircleMarker
