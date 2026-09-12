@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { CircleAlert, MapPin, Upload, Send, CheckCircle2 } from "lucide-react";
+import {
+  CircleAlert,
+  MapPin,
+  Upload,
+  Send,
+  CheckCircle2,
+  LocateFixed,
+} from "lucide-react";
 import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import "./styles.css";
@@ -37,10 +44,25 @@ function App() {
 
   const submit = async (event) => {
     event.preventDefault();
-    if (!file) return setNotice("Select a road image first.");
+    if (!file) return setNotice("Select a road image or dashcam video first.");
+    setNotice(
+      file.type.startsWith("video/")
+        ? "Extracting a frame from the dashcam video…"
+        : "Uploading evidence and detecting potholes…",
+    );
+
+    let evidence = file;
+    try {
+      if (file.type.startsWith("video/")) {
+        evidence = await extractVideoFrame(file);
+      }
+    } catch (error) {
+      return setNotice(error.message);
+    }
+
     setNotice("Uploading evidence and detecting potholes…");
     const body = new FormData();
-    body.append("file", file);
+    body.append("file", evidence, evidence.name);
     Object.entries(form).forEach(([key, value]) => body.append(key, value));
     const response = await fetch(`${API}/reports/detect`, {
       method: "POST",
@@ -66,6 +88,27 @@ function App() {
       body: JSON.stringify({ status: nextStatus }),
     });
     load();
+  };
+
+  const useCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setNotice("Location services are not supported by this browser.");
+      return;
+    }
+
+    setNotice("Getting your current location…");
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setForm((current) => ({
+          ...current,
+          latitude: coords.latitude.toFixed(6),
+          longitude: coords.longitude.toFixed(6),
+        }));
+        setNotice("Current location added to the report.");
+      },
+      () => setNotice("Location permission was denied. Enter coordinates manually."),
+      { enableHighAccuracy: true, timeout: 10_000 },
+    );
   };
 
   return (
@@ -133,17 +176,17 @@ function App() {
               <Upload size={19} /> New pothole report
             </h3>
             <label>
-              Road image
+              Road image or dashcam video
               <input
                 type="file"
-                accept="image/*"
+                accept="image/*,video/*"
                 onChange={(e) => setFile(e.target.files[0])}
                 required
               />
             </label>
             <small className="field-note">
-              For dashcam videos, upload a captured frame. The model evaluates
-              images.
+              Videos are converted to a frame in your browser; only that frame
+              is sent to the pothole model.
             </small>
             <div className="coordinates">
               <label>
@@ -167,6 +210,13 @@ function App() {
                 />
               </label>
             </div>
+            <button
+              className="location-button"
+              type="button"
+              onClick={useCurrentLocation}
+            >
+              <LocateFixed size={15} /> Use my current location
+            </button>
             <label>
               Captured at
               <input
@@ -228,3 +278,32 @@ function App() {
   );
 }
 createRoot(document.getElementById("root")).render(<App />);
+
+function extractVideoFrame(videoFile) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    const objectUrl = URL.createObjectURL(videoFile);
+    video.muted = true;
+    video.preload = "metadata";
+
+    video.onloadedmetadata = () => {
+      video.currentTime = Math.min(1, Math.max(0, video.duration / 2));
+    };
+    video.onseeked = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        URL.revokeObjectURL(objectUrl);
+        if (!blob) return reject(new Error("Could not extract a frame from this video."));
+        resolve(new File([blob], `${videoFile.name}-frame.jpg`, { type: "image/jpeg" }));
+      }, "image/jpeg", 0.9);
+    };
+    video.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("This video could not be read. Try an MP4 or upload an image."));
+    };
+    video.src = objectUrl;
+  });
+}

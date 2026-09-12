@@ -21,3 +21,6 @@ detection:
   minimum-confidence: ${POTHOLE_MINIMUM_CONFIDENCE:0.40}
 civic:
   webhook: ${CIVIC_REPORTING_WEBHOOK:}
+app:
+  # Comma-separated browser origins. Override with APP_CORS_ORIGINS when deployed.
+  cors-origins: ${APP_CORS_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}

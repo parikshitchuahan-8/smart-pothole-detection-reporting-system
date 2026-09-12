@@ -5,6 +5,22 @@
   font-size: 11px;
   line-height: 1.4;
 }
+
+.location-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 9px;
+  border: 1px solid #9bbcaf;
+  border-radius: 6px;
+  background: #f5faf7;
+  color: #286450;
+  font: 600 12px inherit;
+  cursor: pointer;
+}
 * {
   box-sizing: border-box;
 }

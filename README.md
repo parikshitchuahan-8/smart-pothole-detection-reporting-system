@@ -9,10 +9,10 @@ React + Spring Boot application for detecting potholes in road images, recording
 
 ## Main workflow
 
-1. A user uploads a road image (or a still extracted from dashcam footage) and supplies its latitude and longitude.
+1. A user uploads a road image or dashcam video and supplies its latitude and longitude. For videos, the browser extracts a representative frame before detection.
 2. The backend saves the evidence to AWS S3 and sends the image to a Hugging Face-compatible pothole model endpoint.
 3. A report is created with detection confidence, severity, location, assigned authority, and `REPORTED` status.
-4. The system posts a structured report to the civic webhook when configured.
+4. The system posts a structured report to the civic webhook when configured. Without a webhook, it creates an auditable local civic-dashboard ticket.
 5. Operators use the map dashboard to filter reports and update status: Reported, Acknowledged, In Progress, or Resolved.
 
 ## Run
@@ -33,6 +33,7 @@ For direct S3 evidence URLs, permit `s3:GetObject` for the `pothole-evidence/*` 
 | `POST` | `/api/reports/detect` | Validates an image and coordinates, calls the model, saves verified evidence to S3, creates a report, and posts a civic webhook event. |
 | `GET` | `/api/reports` | Returns reports, optionally filtered by `status`. |
 | `PATCH` | `/api/reports/{id}/status` | Moves a report through the repair workflow and writes a status-history record. |
+| `GET` | `/api/civic-dispatches` | Lists automatically-created local civic tickets or webhook delivery outcomes. |
 
 The application never creates a report when model inference fails or no prediction meets the configured confidence threshold. This avoids treating an AI estimate as a verified road defect.
 
