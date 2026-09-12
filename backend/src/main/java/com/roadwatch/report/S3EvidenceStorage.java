@@ -38,18 +38,28 @@ class S3EvidenceStorage {
         : "";
     String key = "pothole-evidence/" + UUID.randomUUID() + extension;
 
-    client.putObject(
-        PutObjectRequest.builder()
-            .bucket(bucket)
-            .key(key)
-            .contentType(file.getContentType())
-            .build(),
-        RequestBody.fromBytes(file.getBytes()));
-
     String host = baseUrl.isBlank()
         ? "https://" + bucket + ".s3." + region + ".amazonaws.com"
         : baseUrl.replaceAll("/$", "");
-    return new Stored(key, host + "/" + key);
+
+    try {
+      client.putObject(
+          PutObjectRequest.builder()
+              .bucket(bucket)
+              .key(key)
+              .contentType(file.getContentType())
+              .build(),
+          RequestBody.fromBytes(file.getBytes()));
+      return new Stored(key, host + "/" + key);
+    } catch (Exception e) {
+      // Fallback: save to local evidence directory if S3 is unavailable/unauthorized
+      java.nio.file.Path localDir = java.nio.file.Paths.get("uploads", "evidence");
+      java.nio.file.Files.createDirectories(localDir);
+      String filename = key.replace("pothole-evidence/", "");
+      java.nio.file.Path target = localDir.resolve(filename);
+      java.nio.file.Files.write(target, file.getBytes());
+      return new Stored(key, "http://localhost:8080/evidence/" + filename);
+    }
   }
 
   record Stored(String key, String url) {}

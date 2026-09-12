@@ -8,6 +8,11 @@ frontend/node_modules/
 frontend/dist/
 backend/target/
 work/
+.venv/
+ai/models/*.pt
+uploads/
+__pycache__/
+*.pyc
 
 # IDE and operating-system files
 .idea/

@@ -34,7 +34,7 @@ public class PotholeReport {
   private Instant capturedAt;
   private Instant createdAt = Instant.now();
 
-  @OneToMany(mappedBy = "report", cascade = CascadeType.ALL, orphanRemoval = true)
+  @OneToMany(mappedBy = "report", cascade = CascadeType.ALL, orphanRemoval = true, fetch = jakarta.persistence.FetchType.EAGER)
   private List<StatusHistory> statusHistory = new ArrayList<>();
 
   public void transitionTo(ReportStatus nextStatus) {

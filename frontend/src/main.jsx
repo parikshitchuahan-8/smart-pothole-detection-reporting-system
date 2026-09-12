@@ -14,6 +14,7 @@ import "./styles.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8080/api";
 const statuses = ["ALL", "REPORTED", "ACKNOWLEDGED", "IN_PROGRESS", "RESOLVED"];
+const severities = ["ALL", "HIGH", "MEDIUM", "LOW"];
 const color = {
   REPORTED: "#e35142",
   ACKNOWLEDGED: "#e9a23b",
@@ -24,6 +25,7 @@ const color = {
 function App() {
   const [reports, setReports] = useState([]);
   const [status, setStatus] = useState("ALL");
+  const [severityFilter, setSeverityFilter] = useState("ALL");
   const [form, setForm] = useState({
     latitude: "28.6139",
     longitude: "77.2090",
@@ -41,6 +43,10 @@ function App() {
   useEffect(() => {
     load();
   }, [status]);
+
+  const filteredReports = reports.filter(
+    (r) => severityFilter === "ALL" || r.severity === severityFilter,
+  );
 
   const submit = async (event) => {
     event.preventDefault();
@@ -132,18 +138,31 @@ function App() {
         <div className="topline">
           <div>
             <h2>Road condition dashboard</h2>
-            <p>{reports.length} reports matching this view</p>
+            <p>{filteredReports.length} reports matching this view</p>
           </div>
-          <div className="filters">
-            {statuses.map((item) => (
-              <button
-                className={status === item ? "selected" : ""}
-                onClick={() => setStatus(item)}
-                key={item}
-              >
-                {item.replace("_", " ")}
-              </button>
-            ))}
+          <div className="filters-group" style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <div className="filters">
+              {statuses.map((item) => (
+                <button
+                  className={status === item ? "selected" : ""}
+                  onClick={() => setStatus(item)}
+                  key={item}
+                >
+                  {item.replace("_", " ")}
+                </button>
+              ))}
+            </div>
+            <div className="filters">
+              {severities.map((item) => (
+                <button
+                  className={severityFilter === item ? "selected" : ""}
+                  onClick={() => setSeverityFilter(item)}
+                  key={item}
+                >
+                  {item} SEVERITY
+                </button>
+              ))}
+            </div>
           </div>
         </div>
         <div className="layout">
@@ -153,7 +172,7 @@ function App() {
                 attribution="&copy; OpenStreetMap contributors"
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
-              {reports.map((report) => (
+              {filteredReports.map((report) => (
                 <CircleMarker
                   key={report.id}
                   center={[report.latitude, report.longitude]}
@@ -236,12 +255,12 @@ function App() {
         </div>
         <section className="reports">
           <h2>Recent reports</h2>
-          {reports.length === 0 ? (
+          {filteredReports.length === 0 ? (
             <p className="empty">
               No reports yet. Upload road evidence to create the first one.
             </p>
           ) : (
-            reports.map((report) => (
+            filteredReports.map((report) => (
               <article key={report.id}>
                 <div className="pin">
                   <MapPin size={19} />
