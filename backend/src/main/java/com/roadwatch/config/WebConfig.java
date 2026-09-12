@@ -10,17 +10,17 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebConfig implements WebMvcConfigurer {
   private final String[] allowedOrigins;
 
-  public WebConfig(@Value("${app.cors-origins:http://localhost:5173,http://127.0.0.1:5173}")
+  public WebConfig(@Value("${app.cors-origins:http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173}")
                    String allowedOrigins) {
     this.allowedOrigins = allowedOrigins.split(",");
   }
 
   @Override
   public void addCorsMappings(CorsRegistry registry) {
-    registry.addMapping("/api/**")
-        .allowedOrigins(allowedOrigins)
-        .allowedMethods("GET", "POST", "PATCH", "OPTIONS")
-        .allowedHeaders("Content-Type", "Accept")
+    registry.addMapping("/**")
+        .allowedOriginPatterns("*")
+        .allowedMethods("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS")
+        .allowedHeaders("*")
         .maxAge(3600);
   }
 }

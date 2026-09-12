@@ -15,6 +15,7 @@ import "./styles.css";
 const API = import.meta.env.VITE_API_URL || "http://localhost:8080/api";
 const statuses = ["ALL", "REPORTED", "ACKNOWLEDGED", "IN_PROGRESS", "RESOLVED"];
 const severities = ["ALL", "HIGH", "MEDIUM", "LOW"];
+const authorities = ["ALL", "MCD", "BBMP", "BMC", "PWD"];
 const color = {
   REPORTED: "#e35142",
   ACKNOWLEDGED: "#e9a23b",
@@ -24,8 +25,11 @@ const color = {
 
 function App() {
   const [reports, setReports] = useState([]);
+  const [dispatches, setDispatches] = useState([]);
+  const [showDispatches, setShowDispatches] = useState(false);
   const [status, setStatus] = useState("ALL");
   const [severityFilter, setSeverityFilter] = useState("ALL");
+  const [authorityFilter, setAuthorityFilter] = useState("ALL");
   const [form, setForm] = useState({
     latitude: "28.6139",
     longitude: "77.2090",
@@ -35,18 +39,31 @@ function App() {
   const [notice, setNotice] = useState("");
 
   const load = async () => {
-    const response = await fetch(
-      `${API}/reports?status=${status === "ALL" ? "" : status}`,
-    );
-    if (response.ok) setReports(await response.json());
+    try {
+      const response = await fetch(
+        `${API}/reports?status=${status === "ALL" ? "" : status}`,
+      );
+      if (response.ok) setReports(await response.json());
+
+      const dispatchRes = await fetch(`${API}/civic-dispatches`);
+      if (dispatchRes.ok) setDispatches(await dispatchRes.json());
+    } catch (err) {
+      console.error("Error loading dashboard data:", err);
+    }
   };
   useEffect(() => {
     load();
   }, [status]);
 
-  const filteredReports = reports.filter(
-    (r) => severityFilter === "ALL" || r.severity === severityFilter,
-  );
+  const filteredReports = reports.filter((r) => {
+    const matchesSeverity = severityFilter === "ALL" || r.severity === severityFilter;
+    const matchesAuthority = authorityFilter === "ALL" || r.authority.includes(authorityFilter);
+    return matchesSeverity && matchesAuthority;
+  });
+
+  const highSeverityCount = reports.filter((r) => r.severity === "HIGH").length;
+  const inProgressCount = reports.filter((r) => r.status === "IN_PROGRESS" || r.status === "REPORTED").length;
+  const resolvedCount = reports.filter((r) => r.status === "RESOLVED").length;
 
   const submit = async (event) => {
     event.preventDefault();
@@ -133,12 +150,57 @@ function App() {
           Spot it. Report it. <em>Fix it.</em>
         </h1>
         <small>AI-assisted pothole detection for faster road repairs.</small>
+        <div className="stats-bar" style={{ display: "flex", gap: "15px", marginTop: "20px", flexWrap: "wrap" }}>
+          <div className="stat-card" style={{ background: "rgba(255,255,255,0.06)", padding: "10px 18px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.1)" }}>
+            <span style={{ fontSize: "12px", opacity: 0.75, display: "block" }}>TOTAL DETECTIONS</span>
+            <b style={{ fontSize: "20px" }}>{reports.length}</b>
+          </div>
+          <div className="stat-card" style={{ background: "rgba(227, 81, 66, 0.1)", padding: "10px 18px", borderRadius: "8px", border: "1px solid rgba(227, 81, 66, 0.3)" }}>
+            <span style={{ fontSize: "12px", color: "#e35142", display: "block" }}>HIGH SEVERITY</span>
+            <b style={{ fontSize: "20px", color: "#e35142" }}>{highSeverityCount}</b>
+          </div>
+          <div className="stat-card" style={{ background: "rgba(57, 123, 187, 0.1)", padding: "10px 18px", borderRadius: "8px", border: "1px solid rgba(57, 123, 187, 0.3)" }}>
+            <span style={{ fontSize: "12px", color: "#397bbb", display: "block" }}>ACTIVE REPAIRS</span>
+            <b style={{ fontSize: "20px", color: "#397bbb" }}>{inProgressCount}</b>
+          </div>
+          <div className="stat-card" style={{ background: "rgba(46, 145, 104, 0.1)", padding: "10px 18px", borderRadius: "8px", border: "1px solid rgba(46, 145, 104, 0.3)" }}>
+            <span style={{ fontSize: "12px", color: "#2e9168", display: "block" }}>RESOLVED DEFECTS</span>
+            <b style={{ fontSize: "20px", color: "#2e9168" }}>{resolvedCount}</b>
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setShowDispatches(!showDispatches)}
+            style={{ marginLeft: "auto", background: showDispatches ? "#397bbb" : "rgba(255,255,255,0.1)", color: "#fff", border: "none", padding: "10px 16px", borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}
+          >
+            📋 {showDispatches ? "Hide Civic Tickets" : `View Civic Tickets (${dispatches.length})`}
+          </button>
+        </div>
       </section>
+      
+      {showDispatches && (
+        <section className="civic-dispatches-view" style={{ margin: "20px 0", padding: "20px", background: "rgba(0,0,0,0.3)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.1)" }}>
+          <h3 style={{ margin: "0 0 15px 0", display: "flex", alignItems: "center", gap: "8px" }}>
+            🏛️ Automated Civic Department Tickets ({dispatches.length})
+          </h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "12px" }}>
+            {dispatches.map((d) => (
+              <div key={d.id} style={{ background: "rgba(255,255,255,0.05)", padding: "12px", borderRadius: "8px", borderLeft: "4px solid #397bbb" }}>
+                <b style={{ fontSize: "14px", display: "block" }}>{d.authority}</b>
+                <span style={{ fontSize: "12px", color: "#2e9168", fontWeight: "600" }}>{d.deliveryStatus}</span>
+                <small style={{ display: "block", fontSize: "11px", opacity: 0.6, marginTop: "4px" }}>
+                  Ticket: {d.id.slice(0, 8)} · {new Date(d.dispatchedAt).toLocaleString()}
+                </small>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="content">
         <div className="topline">
           <div>
             <h2>Road condition dashboard</h2>
-            <p>{filteredReports.length} reports matching this view</p>
+            <p>{filteredReports.length} reports matching filters</p>
           </div>
           <div className="filters-group" style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             <div className="filters">
@@ -160,6 +222,17 @@ function App() {
                   key={item}
                 >
                   {item} SEVERITY
+                </button>
+              ))}
+            </div>
+            <div className="filters">
+              {authorities.map((item) => (
+                <button
+                  className={authorityFilter === item ? "selected" : ""}
+                  onClick={() => setAuthorityFilter(item)}
+                  key={item}
+                >
+                  {item === "ALL" ? "ALL ZONES" : item}
                 </button>
               ))}
             </div>

@@ -1,12 +1,14 @@
 package com.roadwatch.report;
 
 import java.util.List;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /** Exposes automatically-created civic dashboard tickets for demonstrations. */
 @RestController
+@CrossOrigin(origins = "*")
 @RequestMapping("/api/civic-dispatches")
 public class CivicDispatchController {
   private final CivicDispatchRepository repository;
