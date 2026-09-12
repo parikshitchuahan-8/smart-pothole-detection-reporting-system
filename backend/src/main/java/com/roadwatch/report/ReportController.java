@@ -52,7 +52,11 @@ public class ReportController {
       @RequestParam LocalDateTime capturedAt) throws IOException {
     if (file.isEmpty()) return badRequest("Road evidence is required.");
     if (!isCoordinateValid(latitude, longitude)) return badRequest("Latitude or longitude is out of range.");
-    if (file.getContentType() == null || !file.getContentType().startsWith("image/")) {
+    String contentType = file.getContentType();
+    String filename = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
+    boolean isImage = (contentType != null && contentType.startsWith("image/"))
+        || filename.endsWith(".jpg") || filename.endsWith(".jpeg") || filename.endsWith(".png") || filename.endsWith(".webp");
+    if (!isImage) {
       return badRequest("Submit a road image. Video frame extraction is handled by the mobile/dashcam client.");
     }
 
