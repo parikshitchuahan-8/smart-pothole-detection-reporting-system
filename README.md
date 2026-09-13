@@ -94,6 +94,31 @@ Open `http://localhost:5173` (or `http://localhost:5174`) in your browser.
 
 ---
 
+## 🔮 Production Scalability & Enterprise Roadmap
+
+For enterprise-scale production deployment, the architecture is designed to easily scale across several dimensions:
+
+1. **Role-Based Access Control (RBAC) & Security**:
+   - Integrate **Spring Security with OAuth2 / JWT** to enforce separation of concerns:
+     - **Citizen / Public Role**: Submit pothole detections, view public heatmap and repair statuses.
+     - **Municipal Officer / PWD Engineer Role**: Manage ticket lifecycle (`ACKNOWLEDGED` ➔ `IN_PROGRESS` ➔ `RESOLVED`), assign contractor work orders, and download compliance audits.
+     - **Admin Role**: Configure municipal boundary polygons, thresholds, and webhook integrations.
+
+2. **Spatial Deduplication & Geo-Clustering (PostGIS)**:
+   - Enable PostgreSQL `PostGIS` extension using `ST_DWithin` spatial queries to cluster and merge duplicate pothole reports submitted by multiple drivers within a 5-meter radius, tracking defect recurrence over time.
+
+3. **High-Throughput Asynchronous Video Pipelines**:
+   - Decouple continuous dashcam feed ingestion using **Apache Kafka** or **AWS SQS**.
+   - Video streams can be processed asynchronously by distributed GPU worker pods (Kubernetes HPA with Celery/KEDA) extracting keyframes at 1 FPS.
+
+4. **Edge AI Inference**:
+   - Export the YOLOv8 model to **ONNX Runtime** or **TensorRT / CoreML** for real-time, low-latency inference directly inside mobile dashcam apps or onboard vehicle units (OBUs), transmitting only verified detections with metadata to conserve mobile bandwidth.
+
+5. **Civic Integrations (WhatsApp, SMS, Government Portals)**:
+   - Expand `AuthorityRouter` with automated integrations to civic CRM platforms (e.g., CPGRAMS, Delhi 311, BBMP Sahaaya) and automated SMS/WhatsApp alerts to zonal engineers.
+
+---
+
 ## 🎥 Reviewer Demo & Walkthrough
 
 Follow [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) for the step-by-step recording guide demonstrating detection, routing, dashboard filters, status workflow, and database verification.
